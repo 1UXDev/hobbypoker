@@ -101,8 +101,8 @@ test('timer decision errors are caught without crashing or rescheduling forever'
 });
 
 
-test('finished hand remains visible for 4999ms and automatically deals at 5000ms',()=>{
-  assert.equal(NEXT_HAND_MS,5000);
+test('finished hand remains visible for 9999ms and automatically deals at 10000ms',()=>{
+  assert.equal(NEXT_HAND_MS,10000);
   const g=game(),clock=fakeClock(),states=[];
   const room={game:g,scored:false};
   const pace=createPacer(room,{setTimer:clock.setTimer,clearTimer:clock.clearTimer,now:clock.now,
@@ -110,13 +110,13 @@ test('finished hand remains visible for 4999ms and automatically deals at 5000ms
   g.act('a','fold',undefined,{deferProgress:true});pace.schedule();
   assert.equal(g.view('a').nextHandAt,null);
   clock.tick(1000);
-  assert.equal(g.phase,'finished');assert.equal(g.nextHandAt,6000);
+  assert.equal(g.phase,'finished');assert.equal(g.nextHandAt,11000);
   const oldResult=g.result,oldDelta=g.players.map(p=>p.lastHandDelta);
   clock.tick(2000);pace.schedule();pace.schedule();
-  assert.equal(g.nextHandAt,6000);assert.equal(clock.size,1);
-  clock.tick(2999);
+  assert.equal(g.nextHandAt,11000);assert.equal(clock.size,1);
+  clock.tick(7999);
   assert.equal(g.phase,'finished');assert.equal(g.result,oldResult);assert.equal(g.handId,1);
-  assert.equal(g.view('a').nextHandAt,6000);
+  assert.equal(g.view('a').nextHandAt,11000);
   clock.tick(1);
   assert.equal(g.handId,2);assert.equal(g.phase,'preflop');assert.equal(g.result,null);
   assert.equal(g.lastAction,null);assert.equal(g.nextHandAt,null);
@@ -126,23 +126,27 @@ test('finished hand remains visible for 4999ms and automatically deals at 5000ms
   pace.stop();
 });
 
-test('manual start during countdown cancels old deal, and unauthorized start keeps deadline',()=>{
+test('manual start cannot shorten the result-review countdown or reset its deadline',()=>{
   const g=game(),clock=fakeClock();
   const pace=createPacer({game:g},{setTimer:clock.setTimer,clearTimer:clock.clearTimer,now:clock.now});
-  g.act('a','fold');pace.schedule();assert.equal(g.nextHandAt,5000);
+  g.act('a','fold');pace.schedule();assert.equal(g.nextHandAt,10000);
+  const result=g.result;
   clock.tick(2000);
-  assert.throws(()=>pace.start('b'));assert.equal(g.nextHandAt,5000);assert.equal(clock.size,1);
-  pace.start('a');assert.equal(g.handId,2);assert.equal(g.nextHandAt,null);assert.equal(clock.size,0);
-  clock.tick(5000);assert.equal(g.handId,2);assert.equal(g.phase,'preflop');
+  assert.throws(()=>pace.start('b'));assert.equal(g.nextHandAt,10000);assert.equal(clock.size,1);
+  assert.throws(()=>pace.start('a'),/Ergebnisanzeige/);
+  assert.equal(g.handId,1);assert.equal(g.result,result);assert.equal(g.nextHandAt,10000);assert.equal(clock.size,1);
+  clock.tick(7999);assert.equal(g.phase,'finished');assert.equal(g.handId,1);
+  clock.tick(1);assert.equal(g.handId,2);assert.equal(g.phase,'preflop');
+  assert.equal(clock.size,0);clock.tick(10000);assert.equal(g.handId,2);
   pace.stop();
 });
 
 test('stopping cancels countdown without dealing or retaining a stale deadline',()=>{
   const g=game(),clock=fakeClock();
   const pace=createPacer({game:g},{setTimer:clock.setTimer,clearTimer:clock.clearTimer,now:clock.now});
-  g.act('a','fold');pace.schedule();assert.equal(g.nextHandAt,5000);
+  g.act('a','fold');pace.schedule();assert.equal(g.nextHandAt,10000);
   pace.stop();assert.equal(clock.size,0);assert.equal(g.nextHandAt,null);
-  clock.tick(5000);pace.schedule();assert.equal(g.handId,1);assert.equal(g.phase,'finished');
+  clock.tick(10000);pace.schedule();assert.equal(g.handId,1);assert.equal(g.phase,'finished');
 });
 
 test('no next deal with exhausted stacks; joining between hands resumes countdown',()=>{
@@ -151,8 +155,8 @@ test('no next deal with exhausted stacks; joining between hands resumes countdow
   g.act('a','fold');g.players[0].chips=0;g.players[1].chips=2000;
   pace.schedule();assert.equal(g.nextHandAt,null);assert.equal(clock.size,0);
   clock.tick(9000);assert.equal(g.handId,1);assert.equal(g.players[0].chips,0);
-  g.add('c','Cara');pace.schedule();assert.equal(g.nextHandAt,14000);assert.equal(clock.size,1);
-  clock.tick(5000);assert.equal(g.handId,2);assert.equal(g.players[0].cards.length,0);
+  g.add('c','Cara');pace.schedule();assert.equal(g.nextHandAt,19000);assert.equal(clock.size,1);
+  clock.tick(10000);assert.equal(g.handId,2);assert.equal(g.players[0].cards.length,0);
   assert.equal(g.players[0].chips,0);assert.equal(g.phase,'preflop');pace.stop();
 });
 

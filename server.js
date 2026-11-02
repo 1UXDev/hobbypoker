@@ -8,7 +8,7 @@ const viewFor=(game,id)=>({...game.view(id),soloBusted:soloBusted(game)});
 const broadcast=r=>{for(const [res,id] of r.clients)res.write(`data: ${JSON.stringify(viewFor(r.game,id))}\n\n`);};
 export const BOT_THINK_MS = 2000;
 export const ACTION_HOLD_MS = 1000;
-export const NEXT_HAND_MS = 5000;
+export const NEXT_HAND_MS = 10000;
 
 export function soloBusted(game) {
   const humans=game.players.filter(player=>!player.bot);
@@ -50,7 +50,7 @@ export function createPacer(room, {
       if (game.result && !soloBusted(game) && game.players.filter(p => p.chips > 0).length >= 2) kind = 'nextHand';
     } else if (game.pendingAdvance !== null) kind = 'hold';
     else if (game.players[game.turn]?.bot) kind = 'think';
-    // Repeated calls preserve a countdown; a manual deal invalidates old work.
+    // Repeated calls preserve the full result-review countdown.
     if (ticket?.handId === game.handId && ticket.kind === kind) return;
     cancel();
     if (!kind) return;
@@ -94,6 +94,7 @@ export function createPacer(room, {
     schedule,
     start(id) {
       // Validate before cancelling so an unauthorized request cannot stop play.
+      if(room.game.phase==='finished'&&room.game.nextHandAt!==null)throw Error('Die nächste Hand startet nach der Ergebnisanzeige automatisch.');
       if(soloBusted(room.game))throw Error('Du bist ausgeschieden. Starte ein neues Spiel gegen die KI.');
       room.game.start(id);
       cancel();room.scored=false;schedule();

@@ -7,6 +7,7 @@ let session, stream, state, equityWorker, equityKey, renderedResult;
 let submitting = false;
 let potFrame, potDisplay = 0, potTarget;
 let countdownTimer, countdownAt, announcedAllIn;
+let pendingAllIn, confirmingAllIn = false;
 const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 function textElement(tag, text, className) {
   const el = document.createElement(tag);
@@ -141,7 +142,7 @@ function playerTile(player, seat, game, celebrate) {
     el.append(
       textElement('div', '', 'avatar'), textElement('strong', '', 'player-name'),
       textElement('div', '', 'blind-badges'), bet, textElement('span', '', 'stack'),
-      textElement('span', '', 'hand-delta'), textElement('span', '', 'player-status'),
+      textElement('span', '', 'hand-delta'), textElement('span', '', 'overall-delta'), textElement('span', '', 'player-status'),
       hand, textElement('span', '', 'hand-name'),
     );
     $('players').append(el);
@@ -165,6 +166,11 @@ function playerTile(player, seat, game, celebrate) {
   const change = el.querySelector('.hand-delta');
   change.textContent = delta == null ? 'Letzte Hand: —' : `Letzte Hand: ${delta > 0 ? '+' : delta < 0 ? '−' : '±'}${format(Math.abs(delta))}`;
   change.className = 'hand-delta ' + (delta > 0 ? 'positive' : delta < 0 ? 'negative' : 'neutral');
+  const overall = player.overallDelta ?? 0;
+  const overallEl = el.querySelector('.overall-delta');
+  overallEl.textContent = `Gesamt: ${overall > 0 ? '+' : overall < 0 ? '−' : '±'}${format(Math.abs(overall))}`;
+  overallEl.className = 'overall-delta ' + (overall > 0 ? 'positive' : overall < 0 ? 'negative' : 'neutral');
+  overallEl.title = 'Gewinn oder Verlust aus allen abgeschlossenen Händen dieser Partie';
   const status = finished ? (player.folded ? 'Gepasst' : 'Hand beendet') : player.folded ? 'Gepasst' : player.chips === 0 && game.phase !== 'waiting' ? 'All-in' : game.turn === seat ? 'Am Zug' : 'Am Tisch';
   el.querySelector('.player-status').textContent = player.winner ? 'Gewonnen' : status;
   renderCards(el.querySelector('.player-cards'), player.cards, {handId: game.handId, animate: Boolean(state)});
@@ -226,11 +232,11 @@ function renderControls(game, me) {
   const myTurn = Boolean(game.players[game.turn]?.me) && !game.actionPending;
   const betweenHands = ['waiting', 'finished'].includes(game.phase);
   $('actions').hidden = !myTurn;
-  $('start').hidden = !game.host || !betweenHands;
+  $('start').hidden = !game.host || !betweenHands || Boolean(game.nextHandAt);
   $('bot').hidden = !game.host || !betweenHands;
   $('bot').disabled = game.players.length >= 8;
   $('start').disabled = game.players.filter(p => p.chips > 0).length < 2;
-  $('start').textContent = game.nextHandAt ? 'Jetzt nächste Hand starten ↗' : 'Hand starten ↗';
+  $('start').textContent = 'Hand starten ↗';
   $('call').textContent = game.current > me.bet ? `Mitgehen ${format(Math.min(me.chips, game.current - me.bet))}` : 'Check';
   const minimum = game.current + game.minRaise;
   const maximum = me.chips + me.bet;
@@ -245,19 +251,15 @@ function renderControls(game, me) {
   const canRaise = maximum >= minimum && me.canRaise !== false;
   input.disabled = !canRaise;
   $('raise').disabled = !canRaise;
-  $('allin').textContent = `All-in · ${format(me.chips)}`;
+  $('allin').textContent = `All-in vorbereiten · ${format(me.chips)}`;
   $('allin').disabled = !myTurn || me.chips === 0 || (me.canRaise === false && maximum > game.current);
   $('quick-bets').replaceChildren(...quickBets(game, me).map(preset => {
     const button = document.createElement('button');
     button.type = 'button';
     button.disabled = preset.disabled;
     button.append(textElement('span', preset.label), textElement('strong', preset.disabled ? '—' : format(preset.amount)));
-    button.title = preset.disabled ? 'Dieser Einsatz ist gerade nicht möglich' : `Erhöhen auf ${preset.amount} Chips auswählen`;
-    button.onclick = () => {
-      input.value = preset.amount;
-      for (const sibling of $('quick-bets').children) sibling.setAttribute('aria-pressed', String(sibling === button));
-    };
-    button.setAttribute('aria-pressed', 'false');
+    button.title = preset.disabled ? 'Dieser Einsatz ist gerade nicht möglich' : `Direkt auf ${preset.amount} Chips erhöhen`;
+    button.onclick = run(() => submitAction('raise', preset.amount));
     return button;
   }));
 }
@@ -289,6 +291,35 @@ function render(game) {
   updateEquity(game, me);
   renderControls(game, me);
   state = game;
+  if (pendingAllIn && actionContext(game) !== pendingAllIn.context) closeAllIn();
+  if (!game.players[game.turn]?.me || game.actionPending) $('advanced-bets').open = false;
+}
+
+function actionContext(game) {
+  const me = game.players.find(player => player.me);
+  return JSON.stringify([game.handId, game.phase, game.turn, game.actionPending, game.current, game.minRaise, game.lastAction?.sequence, me.chips, me.bet, me.canRaise]);
+}
+
+function closeAllIn() {
+  pendingAllIn = undefined;
+  $('confirm-allin').close();
+}
+
+function submitAction(type, amount) {
+  if (!state?.players[state.turn]?.me || state.actionPending) throw Error('Du bist nicht am Zug.');
+  const me = state.players.find(player => player.me);
+  const paid = type === 'allin' ? me.chips : type === 'raise' ? amount - me.bet : type === 'call' ? Math.min(me.chips, Math.max(0, state.current - me.bet)) : 0;
+  // Pot shortcuts can reach the stack limit too: every all-in requires intent.
+  if (paid > 0 && paid === me.chips) {
+    pendingAllIn = {type, amount, context: actionContext(state)};
+    $('confirm-allin-description').textContent = `Alle ${format(me.chips)} verbleibenden Chips setzen?`;
+    $('confirm-allin-error').textContent = '';
+    $('confirm-allin-submit').textContent = `${format(me.chips)} Chips setzen`;
+    $('confirm-allin').showModal();
+    $('cancel-allin').focus();
+    return;
+  }
+  return api('/action', {type, amount});
 }
 
 function run(fn) {
@@ -308,7 +339,7 @@ $('join').onsubmit = run(async () => {
 for (const type of ['fold', 'call', 'raise', 'allin']) {
   $(type).onclick = run(() => {
     if (type === 'raise' && !$('amount').reportValidity()) return;
-    return api('/action', {type, amount: Number($('amount').value)});
+    return submitAction(type, Number($('amount').value));
   });
 }
 $('start').onclick = run(() => api('/start'));
@@ -317,6 +348,28 @@ $('copy').onclick = run(async () => {
   await navigator.clipboard.writeText(session.room);
   $('connection').textContent = 'RAUMCODE KOPIERT';
 });
+$('cancel-allin').onclick = closeAllIn;
+$('confirm-allin').addEventListener('cancel', event => {
+  if (confirmingAllIn) event.preventDefault();
+  else pendingAllIn = undefined;
+});
+$('confirm-allin-submit').onclick = async () => {
+  if (submitting || !pendingAllIn) return;
+  if (actionContext(state) !== pendingAllIn.context) { closeAllIn(); return; }
+  const action = pendingAllIn;
+  submitting = true;
+  confirmingAllIn = true;
+  $('confirm-allin-submit').disabled = true;
+  $('cancel-allin').disabled = true;
+  try { await api('/action', {type: action.type, amount: action.amount}); closeAllIn(); }
+  catch (error) { $('confirm-allin-error').textContent = error.message; }
+  finally {
+    submitting = false;
+    confirmingAllIn = false;
+    $('confirm-allin-submit').disabled = false;
+    $('cancel-allin').disabled = false;
+  }
+};
 try {
   session = JSON.parse(sessionStorage.getItem('hobbypoker'));
   if (session) connect();

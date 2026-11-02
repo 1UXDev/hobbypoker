@@ -5,7 +5,7 @@ export { rank, compare } from './poker.js';
 
 export class Game {
   constructor(){this.players=[];this.board=[];this.handId=0;this.result=null;this.nextHandAt=null;this.smallBlind=-1;this.bigBlind=-1;this.lastAction=null;this.actionSequence=0;this.pendingAdvance=null;this.phase='waiting';this.dealer=-1;this.turn=-1;this.message='Warte auf mindestens zwei Spieler.';}
-  add(id,name){if(this.players.length>=8)throw Error('Der Tisch ist voll.');if(!['waiting','finished'].includes(this.phase))throw Error('Die Hand läuft bereits.');this.players.push({id,name,chips:1000,cards:[],bet:0,total:0,folded:false,lastHandDelta:null});}
+  add(id,name){if(this.players.length>=8)throw Error('Der Tisch ist voll.');if(!['waiting','finished'].includes(this.phase))throw Error('Die Hand läuft bereits.');this.players.push({id,name,chips:1000,cards:[],bet:0,total:0,folded:false,lastHandDelta:null,overallDelta:0});}
   next(i,predicate){for(let n=1;n<=this.players.length;n++){const j=(i+n)%this.players.length;if(predicate(this.players[j]))return j;}return -1;}
   pay(p,n){n=Math.min(n,p.chips);p.chips-=n;p.bet+=n;p.total+=n;}
   canRaise(p){return this.pendingAdvance===null&&!['waiting','finished'].includes(this.phase)&&!p.folded&&p.chips>0&&(!p.acted||this.current-(p.raiseBasis??0)>=this.minRaise);}
@@ -116,7 +116,10 @@ export class Game {
 
   finish(message) {
     this.phase='finished';this.turn=-1;this.pendingAdvance=null;this.message=message;
-    for (const p of this.players) p.lastHandDelta = p.chips-(p.handStart ?? p.chips);
+    for (const p of this.players) {
+      p.lastHandDelta = p.chips-(p.handStart ?? p.chips);
+      p.overallDelta = (p.overallDelta ?? 0)+p.lastHandDelta;
+    }
   }
 
   view(id) {
@@ -127,7 +130,7 @@ export class Game {
         return {
           name:p.name, chips:p.chips, bet:p.bet, total:p.total, folded:p.folded,canRaise:this.canRaise(p),
           cards:shown ? p.cards : p.cards.map(() => null), me, isBot:Boolean(p.bot),
-          lastHandDelta:p.lastHandDelta,
+          lastHandDelta:p.lastHandDelta,overallDelta:p.overallDelta??0,
           winner:Boolean(this.result?.winners.some(winner => winner.seat === seat)),
           handName:shown && p.cards.length === 2 && this.board.length >= 3
             ? handName(rank([...p.cards, ...this.board])) : null,
