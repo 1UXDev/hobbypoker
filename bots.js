@@ -20,7 +20,8 @@ export function decide(game,index,random=()=>randomInt(1000000)/1000000){
  const threshold=pressure+b.aversion*.2+b.tightness*(game.board.length? .12:.3)-b.stickiness*.25;
  if(cost>0&&strength+aggression*.1+positionBonus+random()*.1<threshold)return {type:'fold'};
  const minimum=game.current+game.minRaise;
- if(p.chips+p.bet>=minimum&&(strength>.65+b.tightness*.1||random()<b.bluff+positionBonus)&&random()<aggression){const desired=Math.ceil((game.current+Math.max(game.minRaise,pot*(.3+aggression*.6)))/b.batch)*b.batch;return {type:'raise',amount:Math.min(p.chips+p.bet,Math.max(minimum,desired))};}
+ if(game.canRaise(p)&&p.chips+p.bet>=minimum&&(strength>.65+b.tightness*.1||random()<b.bluff+positionBonus)&&random()<aggression){const desired=Math.ceil((game.current+Math.max(game.minRaise,pot*(.3+aggression*.6)))/b.batch)*b.batch;return {type:'raise',amount:Math.min(p.chips+p.bet,Math.max(minimum,desired))};}
+ if(game.canRaise(p)&&p.chips+p.bet>game.current&&p.chips+p.bet<minimum&&strength>.75&&random()<aggression)return {type:'allin'};
  return {type:'call'};
 }
 export function updateMoods(game){for(const p of game.players)if(p.bot){const delta=p.chips-(p.handStart??p.chips);p.mood=Math.max(-2,Math.min(2,(p.mood||0)*.65+(delta<0?-1:delta>0?1:0)));}}

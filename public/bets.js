@@ -11,6 +11,6 @@ export function quickBets(game, player) {
   ].map(preset => ({
     ...preset,
     amount: Math.min(maximum, Math.max(minimum, preset.target)),
-    disabled: Boolean(preset.unavailable || maximum < minimum),
+    disabled: Boolean(preset.unavailable || maximum < minimum || player.canRaise === false),
   }));
 }

@@ -16,3 +16,8 @@ test('presets clamp to full minimum raise and stack, disabling short raises', ()
   assert.deepEqual(quickBets({current: 50, minRaise: 30, pot: 500}, {bet: 20, chips: 80}).map(b => b.amount), [100, 100, 100]);
   assert.ok(quickBets({current: 100, minRaise: 50, pot: 500}, {bet: 20, chips: 60}).every(b => b.disabled));
 });
+
+
+test('short all-in does not expose raise presets when action has not reopened', () => {
+  assert.ok(quickBets({current:30,minRaise:20,pot:80}, {bet:20,chips:980,canRaise:false}).every(b=>b.disabled));
+});

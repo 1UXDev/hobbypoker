@@ -1,0 +1,85 @@
+/* Dealt cards retain the existing responsive .card dimensions. */
+.card.dealt-card,
+.card.dealt-card.back {
+  position: relative;
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  perspective: 700px;
+  overflow: visible;
+}
+
+.card.dealt-card .card-inner {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transform: rotateY(0deg);
+  border-radius: inherit;
+}
+
+.card.dealt-card.is-revealed .card-inner { transform: rotateY(180deg); }
+
+.card.dealt-card .card-face {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  box-shadow: 0 6px 14px #0003;
+}
+
+.card.dealt-card .card-back {
+  display: grid;
+  place-items: center;
+  color: #8baf98;
+  border: 3px solid #557260;
+  background: repeating-linear-gradient(45deg, #214e3d, #214e3d 3px, #285844 3px, #285844 5px);
+  transform: rotateY(0deg);
+}
+
+.card.dealt-card .card-front {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 9px;
+  color: #21332a;
+  background: #f4f0e4;
+  transform: rotateY(180deg);
+}
+
+.card.dealt-card.red .card-front { color: #b54744; }
+.card.dealt-card .card-value { align-self: flex-start; font-size: inherit; line-height: 1; }
+.card.dealt-card .card-suit { align-self: flex-end; font-size: 27px; line-height: 1; }
+.card.dealt-card.is-placeholder .card-back { opacity: .35; box-shadow: none; }
+
+/* Deal face down first, then turn it over. Only changed slots get these classes. */
+.card.dealt-card.card-arriving {
+  animation: card-deal-in 280ms cubic-bezier(.2, .75, .25, 1) var(--deal-delay, 0ms) backwards;
+}
+.card.dealt-card.card-revealing .card-inner {
+  animation: card-turn-over 420ms cubic-bezier(.4, .05, .2, 1) var(--flip-delay, 300ms) backwards;
+}
+
+@keyframes card-deal-in {
+  from { opacity: 0; transform: translate(24px, -35px) rotate(9deg) scale(.9); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes card-turn-over {
+  from { transform: rotateY(0deg); }
+  to { transform: rotateY(180deg); }
+}
+
+@media (max-width: 650px) {
+  .card.dealt-card .card-front { padding: 6px; }
+  .card.dealt-card .card-suit { font-size: 21px; }
+}
+.player-cards .card.dealt-card .card-front { padding: 4px; }
+.player-cards .card.dealt-card .card-suit { font-size: 15px; }
+.player-cards .card.dealt-card .card-back { border-width: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .card.dealt-card,
+  .card.dealt-card .card-inner { animation: none !important; }
+}

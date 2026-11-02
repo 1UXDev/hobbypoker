@@ -30,3 +30,21 @@ body{min-width:280px}button,input{min-height:48px}input{font-size:16px}button:fo
 @keyframes winner-glow{0%,55%{box-shadow:0 0 24px #e4be7855}100%{box-shadow:0 0 0 transparent}}
 @media(min-width:651px){.hand-result{padding:26px}.result-winner{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center}.result-hand{grid-column:1}.result-amount{grid-column:2;grid-row:1/3}.quick-bets button{font-size:11px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}.pot strong{will-change:auto}}
+
+/* The chips committed to the current street are the primary player metric. */
+.player .player-bet{display:flex;flex-direction:column;gap:3px;padding:10px 12px;background:#e4be7817;border:1px solid #b8965355;border-radius:9px;color:var(--gold);margin:2px 0}
+.player .bet-label{font-size:9px;letter-spacing:1px;line-height:1.5;text-transform:uppercase;color:#e8cf9e}
+.player .bet-amount{font-size:28px;line-height:1.1;font-weight:800;color:#f5cf86;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.player .stack{font-size:12px;font-weight:500;color:#a6b5aa;line-height:1.5}
+.player.folded{opacity:1}.player.folded .player-name,.player.folded .avatar,.player.folded .player-cards{opacity:.55}.player.folded .player-bet{background:#e4be780d}
+.blind-badges{display:flex;flex-wrap:wrap;gap:5px;min-height:20px}.blind-badges span{display:inline-flex;align-items:center;border:1px solid #6e7758;border-radius:4px;padding:3px 5px;font-size:9px;line-height:1.1;color:#cedbbb;letter-spacing:.4px}.blind-badges .dealer-badge{background:#e4be78;color:#233221;border-color:#e4be78;font-weight:700}
+.next-hand{border:1px solid #62764c;border-radius:9px;background:#223020;padding:13px 18px;margin:0 0 24px;color:#d2e4b8;font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;text-align:center}
+@media(min-width:651px){.player .bet-amount{font-size:30px}}
+
+.allin-button{display:block;width:100%;margin-top:10px;border:1px solid #de9474;background:linear-gradient(100deg,#713a30,#874b2c);color:#ffe0bd;font-size:14px;font-weight:800;letter-spacing:.5px;min-height:50px}
+.allin-button:hover{background:#985631}.felt{position:relative}.allin-notice{position:absolute;z-index:2;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;gap:7px;width:max-content;max-width:90%;padding:17px 22px;border:1px solid #f6c18b;border-radius:12px;background:linear-gradient(120deg,#793b2a,#3b261f);color:#ffe0ad;text-align:center;box-shadow:0 8px 35px #0008;overflow-wrap:anywhere}
+.allin-notice strong{font-size:25px;letter-spacing:4px}.allin-notice span{font-size:12px;font-weight:600;letter-spacing:.3px}.allin-notice.allin-pop{animation:allin-slam .65s cubic-bezier(.2,.8,.2,1) both}.allin-action .felt{box-shadow:inset 0 0 60px #0005,0 0 25px #e8995c55}
+.player.allin-seat{border-color:#e49a77}.player.allin-seat .player-bet{background:linear-gradient(120deg,#713b2b55,#e4be7817);border-color:#d9976e}.player.allin-seat .bet-amount{color:#ffc493}.player.allin-seat .player-status{color:#ffc493;font-weight:800;letter-spacing:1px}
+.loss-screen{color:#f2f3e9;width:min(440px,calc(100% - 32px));max-height:calc(100dvh - 32px);overflow:auto;background:linear-gradient(145deg,#293323,#151e19);border:1px solid #977744;border-radius:20px;padding:32px;text-align:center;box-shadow:0 25px 100px #0009}.loss-screen::backdrop{background:#06100cce;backdrop-filter:blur(6px)}.loss-screen h2{font-size:32px;line-height:1.2;margin-bottom:20px}.loss-screen .eyebrow{font-size:9px;line-height:1.6}.loss-icon{font-size:45px;color:var(--gold);margin-bottom:20px}.loss-screen>p{font-size:14px}.loss-screen button{width:100%;margin-top:15px;min-height:52px}.loss-screen #loss-error{color:#f6aaa2;font-size:12px;margin-bottom:0}
+@keyframes allin-slam{0%{opacity:0;transform:translate(-50%,-50%) scale(1.35) rotate(-5deg)}60%{opacity:1;transform:translate(-50%,-50%) scale(.96)}100%{transform:translate(-50%,-50%) scale(1)}}
+@media(prefers-reduced-motion:reduce){.allin-notice{animation:none!important}.loss-screen::backdrop{backdrop-filter:none}}

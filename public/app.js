@@ -1,30 +1,13 @@
 import {quickBets} from './bets.js';
+import {renderCards} from './cards.js';
 
 const $ = id => document.getElementById(id);
-const suits = ['♠', '♥', '♦', '♣'];
 const format = n => n.toLocaleString('de-DE');
 let session, stream, state, equityWorker, equityKey, renderedResult;
 let submitting = false;
 let potFrame, potDisplay = 0, potTarget;
+let countdownTimer, countdownAt, announcedAllIn;
 const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-function card(c) {
-  const el = document.createElement('div');
-  el.className = 'card' + (c && (c.s === 1 || c.s === 2) ? ' red' : '') + (!c ? ' back' : '');
-  if (c) {
-    const value = ({11: 'J', 12: 'Q', 13: 'K', 14: 'A'})[c.v] || String(c.v);
-    el.append(value);
-    const suit = document.createElement('span');
-    suit.textContent = suits[c.s];
-    el.append(suit);
-    el.setAttribute('aria-label', `${value} ${suits[c.s]}`);
-  } else {
-    el.textContent = '♠';
-    el.setAttribute('aria-label', 'Verdeckte Karte');
-  }
-  return el;
-}
-function cards(el, list) { el.replaceChildren(...list.map(card)); }
 function textElement(tag, text, className) {
   const el = document.createElement(tag);
   el.textContent = text;
@@ -146,24 +129,97 @@ function renderResult(game) {
 }
 
 function playerTile(player, seat, game, celebrate) {
-  const el = document.createElement('div');
-  const acting = game.actionPending && game.lastAction?.seat === seat;
-  el.className = 'player' + (game.turn === seat || acting ? ' active' : '') + (player.folded ? ' folded' : '') + (player.winner ? ' winner' : '') + (player.winner && celebrate ? ' winner-pop' : '');
-  const avatar = textElement('div', player.winner ? '♛' : player.name[0].toUpperCase(), 'avatar');
-  const name = textElement('strong', player.name + (player.me ? ' (du)' : '') + (game.dealer === seat ? ' · D' : ''), 'player-name');
-  const balance = textElement('span', `${format(player.chips)} Chips`, 'stack');
-  const delta = player.lastHandDelta;
-  const change = textElement('span', delta == null ? 'Letzte Hand: —' : `Letzte Hand: ${delta > 0 ? '+' : delta < 0 ? '−' : '±'}${format(Math.abs(delta))}`, 'hand-delta ' + (delta > 0 ? 'positive' : delta < 0 ? 'negative' : 'neutral'));
-  const status = game.phase === 'finished' ? (player.folded ? 'Gepasst' : 'Hand beendet') : player.folded ? 'Gepasst' : player.chips === 0 && game.phase !== 'waiting' ? 'All-in' : `Einsatz ${format(player.bet)}`;
-  el.append(avatar, name, balance, change, textElement('span', player.winner ? 'Gewonnen' : status, 'player-status'));
-  if (player.cards.length) {
+  // Keep each seat and its card nodes mounted while live state changes.
+  let el = $('players').children[seat];
+  if (!el) {
+    el = document.createElement('div');
+    const bet = document.createElement('div');
+    bet.className = 'player-bet';
+    bet.append(textElement('span', '', 'bet-label'), textElement('strong', '', 'bet-amount'));
     const hand = document.createElement('div');
     hand.className = 'cards player-cards';
-    cards(hand, player.cards);
-    el.append(hand);
-    if (player.handName) el.append(textElement('span', player.handName, 'hand-name'));
+    el.append(
+      textElement('div', '', 'avatar'), textElement('strong', '', 'player-name'),
+      textElement('div', '', 'blind-badges'), bet, textElement('span', '', 'stack'),
+      textElement('span', '', 'hand-delta'), textElement('span', '', 'player-status'),
+      hand, textElement('span', '', 'hand-name'),
+    );
+    $('players').append(el);
   }
-  return el;
+  const acting = game.actionPending && game.lastAction?.seat === seat;
+  el.className = 'player' + (game.turn === seat || acting ? ' active' : '') + (player.folded ? ' folded' : '') + (player.winner ? ' winner' : '') + (player.winner && celebrate ? ' winner-pop' : '') + (player.chips === 0 && !player.folded && !['waiting', 'finished'].includes(game.phase) ? ' allin-seat' : '');
+  el.querySelector('.avatar').textContent = player.winner ? '♛' : player.name[0].toUpperCase();
+  el.querySelector('.player-name').textContent = player.name + (player.me ? ' (du)' : '');
+  const badges = [];
+  if (game.dealer === seat) badges.push(textElement('span', 'D', 'dealer-badge'));
+  if (game.smallBlind === seat) badges.push(textElement('span', 'SB 10', 'blind-badge'));
+  if (game.bigBlind === seat) badges.push(textElement('span', 'BB 20', 'blind-badge'));
+  el.querySelector('.blind-badges').replaceChildren(...badges);
+  el.querySelector('.blind-badges').hidden = !badges.length;
+  const finished = game.phase === 'finished';
+  el.querySelector('.bet-label').textContent = finished ? 'In dieser Hand gesetzt' : 'Einsatz';
+  el.querySelector('.bet-amount').textContent = format(finished ? player.total : player.bet);
+  el.querySelector('.player-bet').hidden = game.phase === 'waiting';
+  el.querySelector('.stack').textContent = `Stack: ${format(player.chips)} Chips`;
+  const delta = player.lastHandDelta;
+  const change = el.querySelector('.hand-delta');
+  change.textContent = delta == null ? 'Letzte Hand: —' : `Letzte Hand: ${delta > 0 ? '+' : delta < 0 ? '−' : '±'}${format(Math.abs(delta))}`;
+  change.className = 'hand-delta ' + (delta > 0 ? 'positive' : delta < 0 ? 'negative' : 'neutral');
+  const status = finished ? (player.folded ? 'Gepasst' : 'Hand beendet') : player.folded ? 'Gepasst' : player.chips === 0 && game.phase !== 'waiting' ? 'All-in' : game.turn === seat ? 'Am Zug' : 'Am Tisch';
+  el.querySelector('.player-status').textContent = player.winner ? 'Gewonnen' : status;
+  renderCards(el.querySelector('.player-cards'), player.cards, {handId: game.handId, animate: Boolean(state)});
+  el.querySelector('.hand-name').textContent = player.handName || '';
+  el.querySelector('.hand-name').hidden = !player.handName;
+}
+
+function updateCountdown(game) {
+  const el = $('next-hand');
+  if (!game.nextHandAt || game.phase !== 'finished') {
+    clearInterval(countdownTimer);
+    countdownAt = undefined;
+    el.hidden = game.phase !== 'finished' || game.soloBusted;
+    el.textContent = game.phase === 'finished' ? 'Für die nächste Hand werden mindestens zwei Spieler mit Chips benötigt.' : '';
+    return;
+  }
+  el.hidden = false;
+  if (countdownAt === game.nextHandAt) return;
+  clearInterval(countdownTimer);
+  countdownAt = game.nextHandAt;
+  const deadline = performance.now() + Math.max(0, game.nextHandAt - game.serverNow);
+  const tick = () => {
+    const seconds = Math.max(0, Math.ceil((deadline - performance.now()) / 1000));
+    el.textContent = seconds ? `Nächste Hand in ${seconds} s` : 'Nächste Hand startet …';
+  };
+  tick();
+  countdownTimer = setInterval(tick, 200);
+}
+
+function renderAllIn(game) {
+  const action = game.lastAction;
+  const active = game.actionPending && action?.allIn;
+  $('allin-notice').hidden = !active;
+  $('game').classList.toggle('allin-action', Boolean(active));
+  if (!active) return;
+  const key = `${game.handId}:${action.sequence}`;
+  if (announcedAllIn === key) return;
+  announcedAllIn = key;
+  $('allin-notice').replaceChildren(
+    textElement('strong', 'ALL-IN'),
+    textElement('span', `${game.players[action.seat].name} · ${format(action.amount)} Chips`),
+  );
+  $('allin-notice').classList.remove('allin-pop');
+  void $('allin-notice').offsetWidth;
+  $('allin-notice').classList.add('allin-pop');
+}
+
+function renderLoss(game, me) {
+  const loss = game.soloBusted && me.chips === 0;
+  const dialog = $('loss');
+  if (loss && !dialog.open) {
+    $('loss-error').textContent = '';
+    dialog.showModal();
+    $('restart').focus();
+  } else if (!loss && dialog.open) dialog.close();
 }
 
 function renderControls(game, me) {
@@ -174,6 +230,7 @@ function renderControls(game, me) {
   $('bot').hidden = !game.host || !betweenHands;
   $('bot').disabled = game.players.length >= 8;
   $('start').disabled = game.players.filter(p => p.chips > 0).length < 2;
+  $('start').textContent = game.nextHandAt ? 'Jetzt nächste Hand starten ↗' : 'Hand starten ↗';
   $('call').textContent = game.current > me.bet ? `Mitgehen ${format(Math.min(me.chips, game.current - me.bet))}` : 'Check';
   const minimum = game.current + game.minRaise;
   const maximum = me.chips + me.bet;
@@ -185,9 +242,11 @@ function renderControls(game, me) {
     input.value = Math.min(maximum, minimum);
     input.dataset.context = context;
   }
-  const canRaise = maximum >= minimum;
+  const canRaise = maximum >= minimum && me.canRaise !== false;
   input.disabled = !canRaise;
   $('raise').disabled = !canRaise;
+  $('allin').textContent = `All-in · ${format(me.chips)}`;
+  $('allin').disabled = !myTurn || me.chips === 0 || (me.canRaise === false && maximum > game.current);
   $('quick-bets').replaceChildren(...quickBets(game, me).map(preset => {
     const button = document.createElement('button');
     button.type = 'button';
@@ -204,25 +263,29 @@ function renderControls(game, me) {
 }
 
 function render(game) {
-  cards($('board'), game.board);
-  while ($('board').children.length < 5) $('board').append(card(null));
+  const board = [...game.board, ...Array(5 - game.board.length).fill(null)];
+  renderCards($('board'), board, {handId: game.handId, animate: Boolean(state), placeholders: true});
   animatePot(game.phase === 'finished' && game.result ? game.result.pot : game.pot, !state || state.handId !== game.handId);
   $('pot-label').textContent = game.phase === 'finished' ? 'POT VERTEILT' : 'POT';
   $('phase').textContent = ({waiting: 'Warte auf Mitspieler', preflop: 'Pre-Flop', flop: 'Flop', turn: 'Turn', river: 'River', finished: 'Hand beendet'})[game.phase];
   $('message').textContent = game.message;
   const me = game.players.find(p => p.me);
-  cards($('hand'), me.cards);
+  renderCards($('hand'), me.cards, {handId: game.handId, animate: Boolean(state)});
   $('my-hand-name').textContent = me.handName || '';
   $('my-hand-name').hidden = !me.handName;
   if (game.actionPending && game.lastAction) {
     const action = game.lastAction;
-    const verb = action.type === 'fold' ? 'passt' : action.amount === 0 ? 'checkt' : `setzt ${format(action.amount)} Chips`;
+    const verb = action.allIn ? `geht All-in mit ${format(action.amount)} Chips` : action.type === 'fold' ? 'passt' : action.amount === 0 ? 'checkt' : `setzt ${format(action.amount)} Chips`;
     $('status').textContent = `${game.players[action.seat].name} ${verb}.`;
   } else {
     $('status').textContent = game.players[game.turn]?.me ? 'Du bist am Zug.' : game.turn >= 0 ? `${game.players[game.turn].name} ist am Zug${game.players[game.turn].isBot ? ' …' : '.'}` : 'Bereit für die nächste Hand?';
   }
   const celebrate = renderResult(game);
-  $('players').replaceChildren(...game.players.map((p, seat) => playerTile(p, seat, game, celebrate)));
+  game.players.forEach((p, seat) => playerTile(p, seat, game, celebrate));
+  while ($('players').children.length > game.players.length) $('players').lastElementChild.remove();
+  updateCountdown(game);
+  renderAllIn(game);
+  renderLoss(game, me);
   updateEquity(game, me);
   renderControls(game, me);
   state = game;
@@ -242,7 +305,7 @@ $('join').onsubmit = run(async () => {
   sessionStorage.setItem('hobbypoker', JSON.stringify(session));
   connect();
 });
-for (const type of ['fold', 'call', 'raise']) {
+for (const type of ['fold', 'call', 'raise', 'allin']) {
   $(type).onclick = run(() => {
     if (type === 'raise' && !$('amount').reportValidity()) return;
     return api('/action', {type, amount: Number($('amount').value)});
@@ -258,3 +321,14 @@ try {
   session = JSON.parse(sessionStorage.getItem('hobbypoker'));
   if (session) connect();
 } catch { sessionStorage.removeItem('hobbypoker'); }
+
+$('loss').addEventListener('cancel', event => event.preventDefault());
+$('restart').onclick = async () => {
+  if (submitting) return;
+  submitting = true;
+  $('restart').disabled = true;
+  $('loss-error').textContent = '';
+  try { await api('/restart'); }
+  catch (error) { $('loss-error').textContent = error.message; }
+  finally { submitting = false; $('restart').disabled = false; }
+};
