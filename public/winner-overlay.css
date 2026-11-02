@@ -1,0 +1,67 @@
+.wo-dialog {
+  width: min(620px, calc(100% - 24px));
+  max-width: none;
+  max-height: 90dvh;
+  padding: 0;
+  overflow: auto;
+  border: 1px solid #af9256;
+  border-radius: 20px;
+  color: #f2f3e9;
+  background: radial-gradient(ellipse at top, #34472d, #14231a 70%);
+  box-shadow: 0 24px 100px #000b, 0 0 70px #d0ae5826;
+}
+.wo-dialog::backdrop { background: #030b08d9; backdrop-filter: blur(7px); }
+.wo-dialog[open] { animation: wo-reveal 320ms ease-out both; }
+.wo-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid #d9bf782e;
+  background: #1b2a1ef5;
+}
+.wo-dialog .wo-title { margin: 0; font: 700 18px/1.3 'Manrope', sans-serif; letter-spacing: -.4px; }
+.wo-dialog .wo-close { min-height: 44px; padding: 8px 12px; flex-shrink: 0; color: #f0dcac; background: #32402b; border-color: #6e7955; font-size: 12px; }
+.wo-dialog .wo-close:focus-visible { outline: 2px solid #e4be78; outline-offset: 3px; }
+.wo-body { padding: 8px 26px 22px; }
+.wo-winner { text-align: center; padding-top: 18px; }
+.wo-winner + .wo-winner { margin-top: 26px; padding-top: 28px; border-top: 1px solid #b7a66842; }
+.wo-dialog .wo-eyebrow { margin: 0 0 6px; color: #b7cd9e; font-size: 10px; line-height: 1.5; font-weight: 700; letter-spacing: 3px; }
+.wo-dialog .wo-name { margin: 0; color: #f9e5b1; font: 800 clamp(26px, 5vw, 38px)/1.2 'Manrope', sans-serif; letter-spacing: -1px; overflow-wrap: anywhere; }
+.wo-dialog .wo-hand-type { margin: 10px 0 0; color: #e4be78; font: 800 clamp(23px, 4.5vw, 32px)/1.25 'Manrope', sans-serif; letter-spacing: -.6px; }
+.wo-dialog .wo-payout { margin: 8px 0 20px; color: #d2e0c4; font-size: 14px; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.wo-dialog .wo-label { margin: 18px 0 10px; font-size: 9px; font-weight: 700; letter-spacing: 2px; line-height: 1.5; color: #aabd9f; }
+.wo-dialog .wo-note { margin: 16px auto 0; max-width: 360px; font-size: 12px; line-height: 1.7; color: #b2c2a8; }
+.wo-hole-cards { gap: 10px; }
+.wo-hole-cards .card.dealt-card { width: 76px; height: 106px; font-size: 27px; border-radius: 8px; }
+.wo-hole-cards .card.dealt-card .card-front { padding: 11px; }
+.wo-hole-cards .card.dealt-card .card-suit { font-size: 34px; }
+.wo-combination { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; width: min(100%, 360px); margin: auto; }
+.wo-card-choice { min-width: 0; }
+.wo-best-card .card.dealt-card { width: 100%; height: auto; aspect-ratio: 5 / 7; font-size: 20px; border-radius: 6px; }
+.wo-best-card .card.dealt-card .card-front { padding: 7px; }
+.wo-best-card .card.dealt-card .card-suit { font-size: 26px; }
+.wo-from-hole .card.dealt-card { outline: 2px solid #e4be78; outline-offset: 2px; }
+.wo-from-board .card.dealt-card { outline: 1px solid #80a591; outline-offset: 2px; }
+.wo-origin { display: block; margin-top: 10px; font-size: 9px; font-weight: 700; letter-spacing: .7px; color: #b1c4b5; }
+.wo-from-hole .wo-origin { color: #e4be78; }
+.wo-dialog .wo-countdown { position: sticky; bottom: 0; margin: 0; padding: 14px 20px; border-top: 1px solid #d9bf782e; background: #17261bf5; font-size: 12px; font-weight: 600; line-height: 1.5; text-align: center; color: #d2e4b8; font-variant-numeric: tabular-nums; }
+@media (max-width: 400px) {
+  .wo-topbar { padding: 12px 14px; gap: 8px; }
+  .wo-dialog .wo-title { font-size: 15px; }
+  .wo-dialog .wo-close { padding: 8px; font-size: 11px; }
+  .wo-body { padding: 4px 16px 20px; }
+  .wo-combination { gap: 6px; }
+  .wo-best-card .card.dealt-card { font-size: 15px; }
+  .wo-best-card .card.dealt-card .card-front { padding: 5px; }
+  .wo-best-card .card.dealt-card .card-suit { font-size: 21px; }
+}
+@keyframes wo-reveal { from { opacity: 0; transform: translateY(12px) scale(.97); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .wo-dialog[open] { animation: none; }
+  .wo-dialog::backdrop { backdrop-filter: none; }
+}

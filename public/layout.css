@@ -1,0 +1,370 @@
+/* In-game layout: compact on phones, one viewport on desktop. */
+@media (min-width: 1100px) {
+  body:not(.playing) > header { height: 72px; }
+  body:not(.playing) > main { padding: 28px 5vw 24px; }
+  body:not(.playing) #lobby { min-height: 0; gap: 72px; align-items: center; }
+  body:not(.playing) #lobby form { padding: 25px; margin: 0; }
+  body:not(.playing) #lobby h1 { font-size: clamp(56px, 5vw, 74px); margin: 20px 0; }
+  body:not(.playing) #lobby .eyebrow { margin-bottom: 12px; }
+  body:not(.playing) #lobby h2 { margin-bottom: 22px; }
+  body:not(.playing) #lobby label { margin-top: 18px; }
+  body:not(.playing) #lobby .rule { margin: 20px 0; }
+  body:not(.playing) .hero-cards { margin-top: 28px; }
+  body:not(.playing) .hero-cards .card { width: 80px; height: 110px; }
+  body:not(.playing) > footer { padding-top: 20px; padding-bottom: 20px; }
+}
+
+body.playing {
+  --table-gap: 10px;
+  --player-columns: 4;
+  --player-rows: 2;
+  min-height: 100dvh;
+}
+
+body.playing > header {
+  height: 48px;
+  padding: 0 14px;
+  flex-shrink: 0;
+}
+body.playing .brand { font-size: 23px; gap: 8px; }
+body.playing .tag { display: none; }
+body.playing #connection { font-size: 8px; letter-spacing: 1px; }
+body.playing > main { width: 100%; max-width: none; padding: 4px 10px 10px; }
+body.playing > footer,
+body.playing aside > .hint,
+body.playing aside > .rule,
+body.playing aside > .eyebrow,
+body.playing #message { display: none; }
+
+body.playing #game { min-width: 0; }
+body.playing .table-heading {
+  min-height: 44px;
+  margin: 0 0 7px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+}
+body.playing .table-heading > div:first-child { display: none; }
+body.playing .table-tools { display: flex; align-items: center; gap: 6px; grid-column: 2; grid-row: 1; }
+body.playing .table-tools button { min-height: 44px; padding: 7px 9px; font-size: 10px; }
+body.playing #copy { white-space: nowrap; }
+body.playing .code strong { margin: 0 4px; }
+body.playing #show-result { border-color: #756140; color: var(--gold); }
+body.playing #next-hand {
+  grid-column: 1;
+  grid-row: 1;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+  padding: 0;
+  color: #bbd29f;
+  text-align: left;
+  font-size: 10px;
+  line-height: 1.35;
+}
+/* Full results live in the accessible winner dialog, opened from the toolbar. */
+body.playing #result {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+body.playing .game-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+body.playing .game-layout > .table-area { display: contents; }
+body.playing .felt {
+  order: 0;
+  height: clamp(130px, calc(100dvh - 660px), 230px);
+  min-width: 0;
+  border-width: 5px;
+  border-radius: 90px;
+  padding: 12px;
+  gap: 7px;
+}
+body.playing .felt-brand { font-size: 10px; letter-spacing: 2px; }
+body.playing #board { gap: 6px; }
+body.playing #board .card { width: 38px; height: 54px; font-size: 16px; }
+body.playing #board .card-front { padding: 6px; }
+body.playing #board .card-suit { font-size: 19px; }
+body.playing .pot { font-size: 9px; letter-spacing: 1px; }
+body.playing .pot strong { font-size: 20px; }
+body.playing #phase { font-size: 10px; }
+body.playing .allin-notice { padding: 10px 14px; }
+body.playing .allin-notice strong { font-size: 20px; }
+
+/* Eight seats remain a single swipeable strip on a phone. */
+body.playing .players {
+  order: 1;
+  display: grid;
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(166px, 44%);
+  grid-template-rows: 134px;
+  gap: 7px;
+  margin: 0;
+  padding: 2px 1px 7px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  scrollbar-color: #64735d transparent;
+}
+body.playing .player {
+  scroll-snap-align: start;
+  padding: 8px;
+  gap: 3px 7px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 57px;
+  grid-template-rows: 24px 33px 15px 15px 15px;
+  align-content: center;
+  min-width: 0;
+  border-radius: 9px;
+}
+body.playing .player .avatar,
+body.playing .player .player-status { display: none; }
+body.playing .player .player-name {
+  grid-column: 1;
+  grid-row: 1;
+  font-size: 11px;
+  line-height: 12px;
+  align-self: center;
+}
+body.playing .blind-badges {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 3px;
+  min-height: 0;
+}
+body.playing .blind-badges span { font-size: 8px; padding: 3px; letter-spacing: 0; }
+body.playing .player .player-bet {
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: baseline;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 0;
+}
+body.playing .player .bet-label {
+  font-size: 7px;
+  line-height: 1.2;
+  letter-spacing: .3px;
+  max-width: none;
+}
+body.playing .player .bet-amount { font-size: 22px; line-height: 1.1; white-space: nowrap; }
+body.playing .player .stack {
+  grid-column: 1;
+  grid-row: 3;
+  font-size: 9px;
+  font-weight: 500;
+  line-height: 14px;
+  white-space: nowrap;
+}
+body.playing .player .hand-delta,
+body.playing .player .overall-delta {
+  grid-column: 1;
+  font-size: 9px;
+  line-height: 14px;
+  margin: 0;
+  white-space: nowrap;
+}
+body.playing .player .hand-delta { grid-row: 4; }
+body.playing .player .overall-delta { grid-row: 5; }
+body.playing .player .player-cards {
+  grid-column: 2;
+  grid-row: 2 / 4;
+  align-self: start;
+  justify-content: flex-end;
+  margin: 0;
+  gap: 3px;
+}
+body.playing .player-cards .card { width: 27px; height: 39px; font-size: 11px; }
+body.playing .player-cards .card-front { padding: 4px; }
+body.playing .player-cards .card-suit { font-size: 13px; }
+body.playing .player .hand-name {
+  grid-column: 2;
+  grid-row: 4 / 6;
+  align-self: center;
+  margin: 0;
+  font-size: 8px;
+  line-height: 11px;
+  text-align: right;
+  overflow-wrap: normal;
+}
+
+body.playing aside {
+  order: 2;
+  padding: 12px;
+  border-radius: 11px;
+  min-width: 0;
+}
+body.playing #status { font-size: 15px; line-height: 1.35; margin: 0 0 8px; }
+body.playing .own-hand-panel {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
+  align-items: center;
+  gap: 0 12px;
+  padding: 0 0 9px;
+  margin: 0 0 9px;
+  border-bottom: 1px solid var(--border);
+}
+body.playing .own-hand-panel > .eyebrow { display: none; }
+body.playing #hand {
+  grid-column: 1;
+  grid-row: 1 / 4;
+  gap: 6px;
+  margin: 0;
+  min-height: 60px;
+  align-items: center;
+}
+body.playing #hand .card { width: 41px; height: 59px; font-size: 18px; }
+body.playing #hand .card-front { padding: 6px; }
+body.playing #hand .card-suit { font-size: 21px; }
+body.playing #my-hand-name { grid-column: 2; grid-row: 1; font-size: 11px; margin: 0; }
+body.playing #equity { grid-column: 2; grid-row: 2; font-size: 12px; line-height: 1.3; margin: 0; }
+body.playing .equity-help { grid-column: 2; grid-row: 3; margin: 0; }
+body.playing .equity-help summary { min-height: 44px; font-size: 9px; line-height: 1.3; }
+body.playing .equity-help p { font-size: 11px; line-height: 1.5; }
+body.playing .equity-help[open] { grid-column: 1 / -1; grid-row: 4; }
+
+body.playing #actions { position: static; padding: 0; }
+body.playing .action-pair { gap: 8px; }
+body.playing .action-pair button { min-height: 44px; padding: 8px; }
+body.playing .quick-bet-hint { margin: 8px 0 4px; font-size: 9px; line-height: 1.25; }
+body.playing .quick-bets { gap: 6px; margin: 0; }
+body.playing .quick-bets button { min-height: 44px; gap: 2px; font-size: 9px; padding: 5px 3px; }
+body.playing .quick-bets button strong { font-size: 12px; }
+body.playing #actions label { margin: 9px 0 5px; font-size: 10px; line-height: 1.3; }
+body.playing .raise { gap: 8px; }
+body.playing .raise input { min-height: 44px; padding: 8px 10px; }
+body.playing .raise button { min-height: 44px; padding: 8px; }
+body.playing .advanced-bets { margin-top: 8px; padding-top: 0; }
+body.playing .advanced-bets summary { min-height: 44px; font-size: 10px; }
+body.playing #allin { min-height: 44px; margin-top: 0; }
+body.playing #bot,
+body.playing #start { min-height: 44px; padding: 10px; }
+body.playing #error:empty { display: none; }
+body.playing #error:not(:empty) { position: fixed; left: 12px; right: 12px; bottom: 12px; margin: 0; z-index: 10; }
+
+@media (min-width: 1100px) {
+  body.playing { height: 100dvh; display: flex; flex-direction: column; }
+  body.playing > header { height: 52px; padding: 0 20px; }
+  body.playing .tag { display: inline; }
+  body.playing > main {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    padding: 8px 20px 14px;
+  }
+  body.playing #game {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-rows: 40px minmax(0, 1fr);
+    gap: 8px;
+  }
+  body.playing .table-heading {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 16px;
+    min-height: 0;
+    height: 40px;
+    margin: 0;
+  }
+  body.playing .table-heading > div:first-child { display: block; }
+  body.playing .table-heading .eyebrow { display: none; }
+  body.playing .table-heading h2 { margin: 0; font-size: 18px; letter-spacing: -.4px; }
+  body.playing #next-hand { grid-column: 2; font-size: 11px; text-align: center; }
+  body.playing .table-tools { grid-column: 3; }
+  body.playing .table-tools button { min-height: 34px; padding: 6px 12px; font-size: 10px; }
+  body.playing .game-layout {
+    grid-column: 1;
+    grid-row: 2;
+    grid-template-columns: minmax(0, 1fr) 286px;
+    min-height: 0;
+    gap: 12px;
+  }
+  body.playing .game-layout > .table-area {
+    display: grid;
+    grid-template-rows: minmax(160px, .95fr) minmax(0, 1fr);
+    gap: 12px;
+    min-height: 0;
+    min-width: 0;
+  }
+  body.playing .felt {
+    height: auto;
+    min-height: 0;
+    border-width: 8px;
+    border-radius: 140px;
+    gap: 10px;
+    padding: 14px;
+  }
+  body.playing #board { gap: 8px; }
+  body.playing #board .card { width: 55px; height: 77px; font-size: 23px; }
+  body.playing #board .card-front { padding: 8px; }
+  body.playing #board .card-suit { font-size: 27px; }
+  body.playing .pot strong { font-size: 27px; }
+  body.playing .felt-brand { font-size: 12px; }
+  body.playing .players {
+    display: grid;
+    grid-template-columns: repeat(var(--player-columns), minmax(0, 1fr));
+    grid-template-rows: repeat(var(--player-rows), minmax(0, 1fr));
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+    gap: 8px;
+    min-height: 0;
+    overflow: visible;
+    padding: 0;
+  }
+  body.playing .player { padding: 10px; gap: 4px 8px; grid-template-columns: minmax(0, 1fr) 62px; }
+  body.playing .player .player-name { font-size: 12px; line-height: 13px; }
+  body.playing .player .stack,
+  body.playing .player .hand-delta,
+  body.playing .player .overall-delta { font-size: 10px; }
+  body.playing .player .bet-amount { font-size: 27px; }
+  body.playing .player .player-bet { flex-direction: row; gap: 5px; }
+  body.playing .player .bet-label { font-size: 8px; max-width: 43px; }
+  body.playing .player-cards .card { width: 29px; height: 42px; font-size: 12px; }
+  body.playing .player-cards .card-suit { font-size: 15px; }
+  body.playing .player .hand-name { font-size: 9px; line-height: 12px; }
+  body.playing .blind-badges span { font-size: 8px; padding: 3px 4px; }
+  body.playing aside {
+    min-height: 0;
+    padding: 16px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #64735d transparent;
+  }
+  body.playing #status { font-size: 17px; line-height: 1.35; margin-bottom: 13px; }
+  body.playing .own-hand-panel { grid-template-columns: 102px minmax(0, 1fr); padding-bottom: 11px; margin-bottom: 12px; }
+  body.playing #hand { min-height: 74px; }
+  body.playing #hand .card { width: 48px; height: 68px; font-size: 21px; }
+  body.playing #hand .card-suit { font-size: 25px; }
+  body.playing #my-hand-name { font-size: 11px; }
+  body.playing .equity-help summary { font-size: 9px; }
+  body.playing .quick-bets button { min-height: 48px; font-size: 10px; }
+}
+
+/* Draw hints replace the old explanatory link in the same compact hand area. */
+body.playing .draw-preview{grid-column:2;grid-row:3;min-height:44px;padding:4px 0;border:0;background:none;color:#dec38d;text-align:left;font-size:10px;line-height:1.3;display:flex;flex-direction:column;justify-content:center;gap:2px;overflow-wrap:anywhere}
+body.playing .draw-preview strong{font-size:10px}.draw-preview span{color:#b8c8ad;font-size:9px}
+.draws-dialog{width:min(520px,calc(100% - 24px));max-height:90dvh;overflow:auto;padding:24px;border:1px solid #7e8159;border-radius:16px;background:#19251d;color:#eef2e6}.draws-dialog::backdrop{background:#06110cd9}.draws-topbar{display:flex;justify-content:space-between;align-items:center;gap:14px}.draws-topbar h2{margin:0;font-size:21px;line-height:1.2}.draws-topbar button{min-height:44px;font-size:11px;padding:8px;white-space:nowrap}.draws-explanation,.draws-note{font-size:12px;line-height:1.6}.draw-row{border-top:1px solid #3b493d;padding:14px 0}.draw-row h3{color:var(--gold);font-size:17px;margin:0 0 7px}.draw-row p{margin:2px 0;font-size:13px;line-height:1.5}.draw-row .draw-outs{color:#e1e7d6;font-weight:700}.draw-row .draw-probability{font-variant-numeric:tabular-nums}.draws-note{margin-bottom:0;color:#aab99f}

@@ -109,9 +109,13 @@ const ASSETS = {
   '/cards.js':['public/cards.js','text/javascript'],
   '/cards.css':['public/cards.css','text/css'],
   '/style.css':['public/style.css','text/css'],
+  '/layout.css':['public/layout.css','text/css'],
+  '/winner-overlay.js':['public/winner-overlay.js','text/javascript'],
+  '/winner-overlay.css':['public/winner-overlay.css','text/css'],
   '/bets.js':['public/bets.js','text/javascript'],
   '/poker.js':['poker.js','text/javascript'],
   '/equity.js':['equity.js','text/javascript'],
+  '/draws.js':['draws.js','text/javascript'],
   '/equity-worker.js':['equity-worker.js','text/javascript'],
 };
 export const server=http.createServer(async(req,res)=>{

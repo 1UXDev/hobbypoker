@@ -1,5 +1,6 @@
 import {quickBets} from './bets.js';
 import {renderCards} from './cards.js';
+import {createWinnerOverlay} from './winner-overlay.js';
 
 const $ = id => document.getElementById(id);
 const format = n => n.toLocaleString('de-DE');
@@ -8,6 +9,8 @@ let submitting = false;
 let potFrame, potDisplay = 0, potTarget;
 let countdownTimer, countdownAt, announcedAllIn;
 let pendingAllIn, confirmingAllIn = false;
+let currentDraws = [];
+const winnerOverlay = createWinnerOverlay();
 const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 function textElement(tag, text, className) {
   const el = document.createElement(tag);
@@ -26,6 +29,8 @@ async function api(path, data = {}) {
   return result;
 }
 function connect() {
+  document.body.classList.add('playing');
+  window.scrollTo(0, 0);
   $('lobby').hidden = true;
   $('game').hidden = false;
   $('code').textContent = session.room;
@@ -67,8 +72,11 @@ function updateEquity(game, me) {
   const el = $('equity');
   const active = !['waiting', 'finished'].includes(game.phase) && !me.folded && me.cards.length === 2;
   el.hidden = !active;
+  $('show-draws').hidden = !active;
   if (!active) {
     equityKey = undefined;
+    currentDraws = [];
+    $('draws-dialog').close();
     equityWorker?.terminate();
     equityWorker = undefined;
     return;
@@ -78,12 +86,17 @@ function updateEquity(game, me) {
   const key = JSON.stringify({handId: game.handId, ...input});
   if (key === equityKey) return;
   equityKey = key;
+  currentDraws = [];
+  $('draws-dialog').close();
+  renderDraws([]);
   el.textContent = 'Gewinnchance wird geschätzt …';
   equityWorker?.terminate();
   try {
     equityWorker = new Worker('/equity-worker.js', {type: 'module'});
     equityWorker.onmessage = ({data}) => {
       if (data.key !== equityKey) return;
+      currentDraws = data.draws || [];
+      renderDraws(currentDraws);
       el.textContent = data.error ? 'Gewinnchance nicht verfügbar' : `≈ ${Math.round(data.equity * 100)} % Gewinnchance`;
     };
     equityWorker.onerror = () => {
@@ -93,39 +106,47 @@ function updateEquity(game, me) {
   } catch { el.textContent = 'Gewinnchance nicht verfügbar'; }
 }
 
-function renderResult(game) {
-  const result = game.result;
-  const el = $('result');
-  el.hidden = !result;
-  if (!result) {
-    renderedResult = undefined;
-    el.classList.remove('celebrate');
-    return false;
+const percent = value => value.toLocaleString('de-DE', {style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1});
+const rankLabel = value => ({11: 'J', 12: 'Q', 13: 'K', 14: 'A'})[value] || String(value);
+function drawCards(draw) {
+  if (draw.nextCardCards?.length && draw.nextCardCards.every(card => card.s === draw.nextCardCards[0].s)) {
+    const suit = ['♠', '♥', '♦', '♣'][draw.nextCardCards[0].s];
+    if (draw.category === 5) return ['Pik ♠', 'Herz ♥', 'Karo ♦', 'Kreuz ♣'][draw.nextCardCards[0].s];
+    return draw.ranks.map(value => rankLabel(value) + suit).join(' / ');
   }
-  if (renderedResult === result.handId) return false;
-  renderedResult = result.handId;
-  const heading = textElement('h3', result.winners.length > 1 ? 'Die Gewinner dieser Hand' : 'Die Hand ist entschieden.');
-  const rows = result.winners.map(winner => {
-    const row = document.createElement('div');
-    row.className = 'result-winner';
+  return draw.ranks.map(rankLabel).join(' / ');
+}
+function renderDraws(draws) {
+  const best = draws.find(draw => draw.outs > 0);
+  const preview = $('show-draws');
+  if (best) {
+    preview.replaceChildren(
+      textElement('strong', `${best.handName} · ${drawCards(best)}`),
+      textElement('span', `${best.outs} Outs · ${percent(best.nextCardProbability)} nächste Karte ⓘ`),
+    );
+  } else preview.textContent = draws.length ? 'Mögliche Hände bis zum River ⓘ' : 'Chancen & Draws erklären ⓘ';
+  $('draws-content').replaceChildren(...draws.map(draw => {
+    const row = document.createElement('section');
+    row.className = 'draw-row';
     row.append(
-      textElement('strong', `${winner.name} gewinnt`),
-      textElement('span', winner.handName || 'Alle anderen haben gepasst', 'result-hand'),
-      textElement('span', `${format(winner.amount)} Chips aus dem Pot`, 'result-amount'),
+      textElement('h3', draw.handName),
+      textElement('p', draw.outs ? `${draw.outs} Outs · ${drawCards(draw)}` : 'Backdoor-Draw · zwei Karten benötigt', 'draw-outs'),
+      textElement('p', `Nächste Karte: ${percent(draw.nextCardProbability)}`, 'draw-probability'),
+      textElement('p', `Am River: ${percent(draw.byRiverProbability)}`, 'draw-probability'),
     );
     return row;
-  });
-  const trophy = textElement('span', '♠', 'winner-emblem');
-  trophy.setAttribute('aria-hidden', 'true');
-  const content = document.createElement('div');
-  content.append(heading, ...rows);
-  el.replaceChildren(trophy, content);
-  el.classList.remove('celebrate');
-  void el.offsetWidth;
-  el.classList.add('celebrate');
-  if (state && state.phase !== 'finished') {
-    el.scrollIntoView({block: 'nearest', behavior: reducedMotion() ? 'instant' : 'smooth'});
-  }
+  }));
+  if (!draws.length) $('draws-content').append(textElement('p', 'Konkrete Verbesserungen werden ab dem Flop angezeigt. Am River sind keine weiteren Karten mehr offen.'));
+}
+
+function renderResult(game) {
+  const result = game.result;
+  $('show-result').hidden = !result;
+  $('result').hidden = !result;
+  if (!result) { renderedResult = undefined; return false; }
+  if (renderedResult === result.handId) return false;
+  renderedResult = result.handId;
+  $('result').textContent = result.winners.map(winner => `${winner.name} gewinnt${winner.handName ? ` mit ${winner.handName}` : ' ohne Showdown'}.`).join(' ');
   return true;
 }
 
@@ -265,6 +286,9 @@ function renderControls(game, me) {
 }
 
 function render(game) {
+  $('game').dataset.phase = game.phase;
+  $('game').style.setProperty('--player-columns', Math.min(4, game.players.length));
+  $('game').style.setProperty('--player-rows', Math.ceil(game.players.length / 4));
   const board = [...game.board, ...Array(5 - game.board.length).fill(null)];
   renderCards($('board'), board, {handId: game.handId, animate: Boolean(state), placeholders: true});
   animatePot(game.phase === 'finished' && game.result ? game.result.pot : game.pot, !state || state.handId !== game.handId);
@@ -284,6 +308,12 @@ function render(game) {
   }
   const celebrate = renderResult(game);
   game.players.forEach((p, seat) => playerTile(p, seat, game, celebrate));
+  if (game.turn >= 0 && game.turn !== state?.turn && matchMedia('(max-width: 1099px)').matches) {
+    const strip = $('players');
+    const tile = strip.children[game.turn];
+    const left = tile.offsetLeft - strip.offsetLeft - (strip.clientWidth - tile.offsetWidth) / 2;
+    strip.scrollTo({left, behavior: reducedMotion() ? 'instant' : 'smooth'});
+  }
   while ($('players').children.length > game.players.length) $('players').lastElementChild.remove();
   updateCountdown(game);
   renderAllIn(game);
@@ -293,6 +323,7 @@ function render(game) {
   state = game;
   if (pendingAllIn && actionContext(game) !== pendingAllIn.context) closeAllIn();
   if (!game.players[game.turn]?.me || game.actionPending) $('advanced-bets').open = false;
+  winnerOverlay.update(game);
 }
 
 function actionContext(game) {
@@ -344,6 +375,10 @@ for (const type of ['fold', 'call', 'raise', 'allin']) {
 }
 $('start').onclick = run(() => api('/start'));
 $('bot').onclick = run(() => api('/bot'));
+$('show-draws').onclick = () => { renderDraws(currentDraws); $('draws-dialog').showModal(); $('close-draws').focus(); };
+$('close-draws').onclick = () => $('draws-dialog').close();
+$('show-result').onclick = () => winnerOverlay.open();
+$('loss-show-result').onclick = () => winnerOverlay.open({allowSoloLoss: true});
 $('copy').onclick = run(async () => {
   await navigator.clipboard.writeText(session.room);
   $('connection').textContent = 'RAUMCODE KOPIERT';
