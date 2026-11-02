@@ -20,19 +20,26 @@ export function bestFiveCards(hole, board) {
   return best;
 }
 
-function displayOrder(combination) {
-  const score = rank(combination.map(entry => entry.card));
-  const straight = score[0] === 4 || score[0] === 8;
-  if (straight) {
-    const value = entry => score[1] === 5 && entry.card.v === 14 ? 1 : entry.card.v;
-    return combination.slice().sort((a, b) => value(a) - value(b));
-  }
-  const counts = new Map();
-  for (const entry of combination) counts.set(entry.card.v, (counts.get(entry.card.v) || 0) + 1);
-  return combination.slice().sort((a, b) => counts.get(b.card.v) - counts.get(a.card.v) || b.card.v - a.card.v);
+/** Keep the original board order; replace only cards unused by the winning five. */
+export function replacementSlots(hole, board) {
+  const combination = bestFiveCards(hole, board);
+  if (combination.length !== 5) return [];
+  const key = card => `${card.v}:${card.s}`;
+  if (new Set([...hole, ...board].map(key)).size !== 7) return [];
+  const selectedBoard = new Set(combination.filter(entry => entry.source === 'board').map(entry => key(entry.card)));
+  const selectedHole = combination.filter(entry => entry.source === 'hole').map(entry => entry.card);
+  let nextHole = 0;
+  return board.map(boardCard => {
+    const replaced = !selectedBoard.has(key(boardCard));
+    return {
+      card: replaced ? selectedHole[nextHole++] : boardCard,
+      source: replaced ? 'hole' : 'board', boardCard, replaced,
+    };
+  });
 }
 
 const format = amount => amount.toLocaleString('de-DE');
+const cardText = card => `${({11: 'J', 12: 'Q', 13: 'K', 14: 'A'})[card.v] || card.v} ${['♠', '♥', '♦', '♣'][card.s]}`;
 function text(tag, content, className) {
   const node = document.createElement(tag);
   node.textContent = content;
@@ -106,26 +113,39 @@ export function createWinnerOverlay() {
       section.append(text('p', 'Alle anderen haben gepasst. Die Hand wurde nicht aufgedeckt.', 'wo-note'));
       return section;
     }
-    const combination = bestFiveCards(publicCards, game.board);
-    if (!combination.length) {
+    const slots = replacementSlots(publicCards, game.board);
+    if (!slots.length) {
       section.append(text('p', 'Die Gewinnerkarten sind nicht aufgedeckt.', 'wo-note'));
       return section;
     }
     const row = document.createElement('div');
     row.className = 'wo-combination';
     row.setAttribute('role', 'list');
-    for (const entry of displayOrder(combination)) {
+    slots.forEach((entry, index) => {
       const choice = document.createElement('div');
-      choice.className = `wo-card-choice wo-from-${entry.source}`;
+      choice.className = `wo-card-choice wo-from-${entry.source}${entry.replaced ? ' wo-replaced' : ''}`;
+      choice.dataset.boardIndex = index;
       choice.setAttribute('role', 'listitem');
+      const stack = document.createElement('div');
+      stack.className = 'wo-card-stack';
+      if (entry.replaced) {
+        const original = document.createElement('div');
+        original.className = 'cards wo-original-card';
+        renderCards(original, [entry.boardCard], {handId: game.handId, animate: false});
+        stack.append(original);
+      }
       const cards = document.createElement('div');
       cards.className = 'cards wo-best-card';
       renderCards(cards, [entry.card], {handId: game.handId, animate: false});
-      choice.append(cards, text('span', entry.source === 'hole' ? 'Hand' : 'Board', 'wo-origin'));
+      stack.append(cards);
+      choice.append(stack, text('span', entry.source === 'hole' ? 'Hand' : 'Board', 'wo-origin'));
+      if (entry.replaced) {
+        choice.append(text('span', `statt ${cardText(entry.boardCard)}`, 'wo-board-hint'));
+      }
       row.append(choice);
-    }
-    section.append(text('p', 'DIE BESTEN FÜNF KARTEN', 'wo-label'), row);
-    if (combination.every(entry => entry.source === 'board')) {
+    });
+    section.append(text('p', 'GEWINNHAND · URSPRÜNGLICHES BOARD DARUNTER', 'wo-label'), row);
+    if (slots.every(entry => entry.source === 'board')) {
       section.append(text('p', 'Das Board spielt: Die besten fünf Karten liegen auf dem Tisch.', 'wo-note'));
     }
     return section;

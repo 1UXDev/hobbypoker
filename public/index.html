@@ -8,6 +8,8 @@
   <link rel="stylesheet" href="/cards.css">
   <link rel="stylesheet" href="/layout.css">
   <link rel="stylesheet" href="/winner-overlay.css">
+  <link rel="stylesheet" href="/faces.css">
+  <link rel="stylesheet" href="/journal.css">
 </head>
 <body>
 <header>
@@ -38,8 +40,9 @@
       <div><div class="eyebrow">DEINE PRIVATE POKERRUNDE</div><h2>Dein Tisch.</h2></div>
       <p id="next-hand" class="next-hand" role="timer" hidden></p>
       <div class="table-tools">
-        <button id="show-result" type="button" hidden>Gewinnhand ansehen</button>
-        <button id="copy" class="code">RAUM <strong id="code"></strong> ⧉</button>
+        <button id="history" type="button" title="Handverlauf und Spielanalyse">Verlauf</button>
+        <button id="show-result" type="button" title="Gewinnhand ansehen" hidden>Gewinnhand</button>
+        <button id="copy" class="code" title="Raumcode kopieren" aria-label="Raumcode kopieren"><strong id="code"></strong> ⧉</button>
       </div>
     </div>
     <section id="result" class="hand-result" aria-live="polite" aria-atomic="true" hidden></section>

@@ -106,6 +106,10 @@ export function createPacer(room, {
 const ASSETS = {
   '/':['public/index.html','text/html'],
   '/app.js':['public/app.js','text/javascript'],
+  '/journal.js':['public/journal.js','text/javascript'],
+  '/journal.css':['public/journal.css','text/css'],
+  '/faces.js':['public/faces.js','text/javascript'],
+  '/faces.css':['public/faces.css','text/css'],
   '/cards.js':['public/cards.js','text/javascript'],
   '/cards.css':['public/cards.css','text/css'],
   '/style.css':['public/style.css','text/css'],

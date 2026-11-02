@@ -7,10 +7,10 @@ function seeded(seed=42){return()=>{seed=(Math.imul(1664525,seed)+1013904223)>>>
 const marginal=[{v:10,s:0},{v:8,s:1}];
 const trash=[{v:7,s:0},{v:2,s:1}];
 const premium=[{v:14,s:0},{v:14,s:1}];
-function fixture(style,{cards=marginal,current=20,pot=100,mood=0}={}){
+function fixture(style,{cards=marginal,current=20,pot=100,mood=0,handsPlayed=0,chips=1000}={}){
   const game=new Game();game.add('bot','Bot');game.add('opponent','Opponent');
   Object.assign(game,{phase:'preflop',current,minRaise:20,dealer:1,turn:0});
-  Object.assign(game.players[0],{bot:{...personalities.find(p=>p.style===style)},mood,cards:structuredClone(cards),chips:1000,total:0});
+  Object.assign(game.players[0],{bot:{...personalities.find(p=>p.style===style)},mood,cards:structuredClone(cards),chips,total:0,stats:{handsPlayed}});
   game.players[1].total=pot;
   return game;
 }
@@ -120,4 +120,66 @@ test('a short-stack value shove remains legal and closed raise rights prevent sh
   assert.equal(closed.canRaise(closed.players[0]),false);
   const response=decide(closed,0,()=>.01);
   assert.ok(response.type==='call'||response.type==='fold');
+});
+
+
+test('patient bots loosen after completed hands while short-stack caution remains',()=>{
+  for(const style of ['Rock','Nit']){
+    const early=sample(style,{handsPlayed:0}),late=sample(style,{handsPlayed:24});
+    assert.ok(early.fold-late.fold>500,`${style} early ${JSON.stringify(early)} late ${JSON.stringify(late)}`);
+    assert.ok(late.raise>early.raise,`${style} should sometimes press its wider range`);
+    const short=sample(style,{handsPlayed:24,chips:25});
+    assert.ok(short.fold-late.fold>800,`${style} short ${JSON.stringify(short)} funded ${JSON.stringify(late)}`);
+    const lateTrash=sample(style,{handsPlayed:24,cards:trash,current:900,pot:1000},2000);
+    assert.ok(lateTrash.fold>1800,`${style} remains cautious against large bets`);
+  }
+});
+
+test('impatience caps at 24 hands and ignores idle time or a previous match handId',()=>{
+  assert.deepEqual(sample('Rock',{handsPlayed:24}),sample('Rock',{handsPlayed:240}));
+  const early=fixture('Rock'),reset=fixture('Rock');
+  early.handId=1;reset.handId=1001;
+  early.matchStartedAt=Date.now();reset.matchStartedAt=0;
+  const a=seeded(17),b=seeded(17);
+  for(let i=0;i<200;i++)assert.deepEqual(decide(early,0,a),decide(reset,0,b));
+});
+
+function learnOpponent(game,aggressive){
+  const own=game.players[0];own.handStart=own.chips;
+  game.phase='finished';
+  for(let i=1;i<=8;i++){
+    game.handId=i;
+    game.handLog={actions:[aggressive
+      ? {seat:1,street:'preflop',type:'raise',amount:100,target:100,currentBetBefore:20,potBefore:80}
+      : {seat:1,street:'preflop',type:'fold',amount:0,target:0,currentBetBefore:20,potBefore:80}]};
+    updateMoods(game);
+  }
+  game.phase='preflop';
+  game.handLog={actions:[{seat:1,street:'preflop',type:'raise',amount:20,target:20,currentBetBefore:0,potBefore:80}]};
+  return game;
+}
+
+test('public betting history makes repeated large bets less intimidating than rare aggression',()=>{
+  const loose=learnOpponent(fixture('Rock'),true),tight=learnOpponent(fixture('Rock'),false);
+  const a=seeded(123),b=seeded(123),folds=[0,0];
+  for(let i=0;i<4000;i++){
+    loose.handId=tight.handId=100+i;
+    if(decide(loose,0,a).type==='fold')folds[0]++;
+    if(decide(tight,0,b).type==='fold')folds[1]++;
+  }
+  assert.ok(folds[1]-folds[0]>400,JSON.stringify(folds));
+});
+
+test('opponent memory updates once per completed hand and stays bounded/private',()=>{
+  const game=learnOpponent(fixture('TAG · Tight-Aggressive'),true),bot=game.players[0];
+  game.phase='finished';game.handId=100;
+  game.handLog={actions:[{seat:1,street:'preflop',type:'raise',amount:100,target:100,currentBetBefore:20,potBefore:80}]};
+  updateMoods(game);const once=structuredClone(bot.botReads);
+  updateMoods(game);assert.deepEqual(bot.botReads,once);
+  for(let i=101;i<200;i++){game.handId=i;updateMoods(game);}
+  const read=bot.botReads.bySeat[1];
+  assert.equal(read.hands,20);assert.ok(read.raiseRate>=0&&read.raiseRate<=1);
+  assert.ok(read.bigBetRate>=0&&read.bigBetRate<=1);
+  const publicView=JSON.stringify(game.view('opponent'));
+  assert.ok(!publicView.includes('botReads'));assert.ok(!publicView.includes('raiseRate'));
 });

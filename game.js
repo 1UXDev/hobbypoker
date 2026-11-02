@@ -1,11 +1,14 @@
-import { randomInt } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 
 import { rank, compare, handName } from './poker.js';
 export { rank, compare } from './poker.js';
 
+const emptyStats = () => ({handsPlayed:0,wins:0,losses:0,breakeven:0,netChips:0,wonChips:0,lostChips:0});
+const copyCards = cards => cards.map(card => card ? {v:card.v,s:card.s} : null);
+
 export class Game {
-  constructor(){this.players=[];this.board=[];this.handId=0;this.result=null;this.nextHandAt=null;this.smallBlind=-1;this.bigBlind=-1;this.lastAction=null;this.actionSequence=0;this.pendingAdvance=null;this.phase='waiting';this.dealer=-1;this.turn=-1;this.message='Warte auf mindestens zwei Spieler.';}
-  add(id,name){if(this.players.length>=8)throw Error('Der Tisch ist voll.');if(!['waiting','finished'].includes(this.phase))throw Error('Die Hand läuft bereits.');this.players.push({id,name,chips:1000,cards:[],bet:0,total:0,folded:false,lastHandDelta:null,overallDelta:0});}
+  constructor(){this.players=[];this.board=[];this.matchId=randomUUID();this.matchStartedAt=null;this.handLog=null;this.finishedHandId=null;this.handId=0;this.result=null;this.nextHandAt=null;this.smallBlind=-1;this.bigBlind=-1;this.lastAction=null;this.actionSequence=0;this.pendingAdvance=null;this.phase='waiting';this.dealer=-1;this.turn=-1;this.message='Warte auf mindestens zwei Spieler.';}
+  add(id,name){if(this.players.length>=8)throw Error('Der Tisch ist voll.');if(!['waiting','finished'].includes(this.phase))throw Error('Die Hand läuft bereits.');this.players.push({id,name,chips:1000,cards:[],bet:0,total:0,folded:false,lastHandDelta:null,overallDelta:0,stats:emptyStats()});}
   next(i,predicate){for(let n=1;n<=this.players.length;n++){const j=(i+n)%this.players.length;if(predicate(this.players[j]))return j;}return -1;}
   pay(p,n){n=Math.min(n,p.chips);p.chips-=n;p.bet+=n;p.total+=n;}
   canRaise(p){return this.pendingAdvance===null&&!['waiting','finished'].includes(this.phase)&&!p.folded&&p.chips>0&&(!p.acted||this.current-(p.raiseBasis??0)>=this.minRaise);}
@@ -14,14 +17,32 @@ export class Game {
     this.handId++;this.result=null;this.nextHandAt=null;this.lastAction=null;this.actionSequence=0;this.pendingAdvance=null;
     this.board=[];this.phase='preflop';this.current=20;this.minRaise=20;
     for(const p of this.players){p.handStart=p.chips;p.bet=0;p.total=0;p.folded=p.chips===0;p.acted=false;p.raiseBasis=null;p.cards=p.folded?[]:[this.deck.pop(),this.deck.pop()];}
+    const startedAt=Date.now();
+    this.matchStartedAt??=startedAt;
+    this.handLog={schemaVersion:1,matchId:this.matchId,handId:this.handId,startedAt,endedAt:null,
+      dealer:-1,smallBlind:-1,bigBlind:-1,blinds:{small:10,big:20},blindPosts:[],actions:[],
+      players:this.players.map((p,seat)=>({seat,name:p.name,isBot:Boolean(p.bot),startingChips:p.chips,holeCards:copyCards(p.cards)})),
+      board:[],result:null};
     this.dealer=this.next(this.dealer,p=>!p.folded);
     const sb=this.players.filter(p=>!p.folded).length===2?this.dealer:this.next(this.dealer,p=>!p.folded);
-    const bb=this.next(sb,p=>!p.folded);this.smallBlind=sb;this.bigBlind=bb;this.pay(this.players[sb],10);this.pay(this.players[bb],20);this.turn=this.next(bb,p=>!p.folded&&p.chips>0);this.message='Neue Hand · Blinds 10 / 20';this.progress(bb);
+    const bb=this.next(sb,p=>!p.folded);this.smallBlind=sb;this.bigBlind=bb;
+    Object.assign(this.handLog,{dealer:this.dealer,smallBlind:sb,bigBlind:bb});
+    this.postBlind(sb,10,'smallBlind');this.postBlind(bb,20,'bigBlind');
+    this.turn=this.next(bb,p=>!p.folded&&p.chips>0);this.message='Neue Hand · Blinds 10 / 20';this.progress(bb);
+  }
+  postBlind(seat,amount,type){
+    const p=this.players[seat],stackBefore=p.chips,potBefore=this.players.reduce((sum,q)=>sum+q.total,0);
+    this.pay(p,amount);
+    this.handLog.blindPosts.push({seat,type,amount:stackBefore-p.chips,target:p.bet,street:'preflop',
+      potBefore,pot:this.players.reduce((sum,q)=>sum+q.total,0),stackBefore,stackAfter:p.chips,at:Date.now()});
   }
   act(id,type,amount,{deferProgress=false}={}) {
     const seat=this.turn,p=this.players[seat];
     if(this.pendingAdvance!==null||!p||p.id!==id||p.folded||p.chips<=0||['waiting','finished'].includes(this.phase))throw Error('Du bist nicht am Zug.');
     const before=p.chips;
+    const context={street:this.phase,potBefore:this.players.reduce((sum,q)=>sum+q.total,0),
+      stackBefore:before,toCall:Math.max(0,this.current-p.bet),currentBetBefore:this.current,
+      minRaiseBefore:this.minRaise,board:copyCards(this.board)};
     if(type==='fold')p.folded=true;
     else if(type==='call')this.pay(p,Math.max(0,this.current-p.bet));
     else if(type==='raise'||type==='allin'){
@@ -47,6 +68,8 @@ export class Game {
     this.lastAction={sequence:++this.actionSequence,seat,
       type:type==='call'&&before===p.chips?'check':type,
       amount:before-p.chips,target:p.bet,allIn:p.chips===0&&type!=='fold'};
+    if(this.handLog)this.handLog.actions.push({...this.lastAction,...context,
+      pot:this.players.reduce((sum,q)=>sum+q.total,0),stackAfter:p.chips,at:Date.now()});
     if(deferProgress){this.pendingAdvance=seat;this.turn=-1;}else this.progress(seat);
   }
   advance(){if(this.pendingAdvance===null)return false;const last=this.pendingAdvance;this.pendingAdvance=null;this.progress(last);return true;}
@@ -115,11 +138,49 @@ export class Game {
   }
 
   finish(message) {
+    if(this.finishedHandId===this.handId)return;
+    this.finishedHandId=this.handId;
     this.phase='finished';this.turn=-1;this.pendingAdvance=null;this.message=message;
     for (const p of this.players) {
       p.lastHandDelta = p.chips-(p.handStart ?? p.chips);
       p.overallDelta = (p.overallDelta ?? 0)+p.lastHandDelta;
+      const stats=p.stats??=emptyStats();
+      if(p.cards.length===2){
+        stats.handsPlayed++;
+        if(p.lastHandDelta>0)stats.wins++;
+        else if(p.lastHandDelta<0)stats.losses++;
+        else stats.breakeven++;
+        stats.netChips=p.overallDelta;
+        stats.wonChips+=Math.max(0,p.lastHandDelta);
+        stats.lostChips+=Math.max(0,-p.lastHandDelta);
+      }
     }
+    if(this.handLog){
+      this.handLog.endedAt=Date.now();
+      this.handLog.board=copyCards(this.board);
+      this.handLog.result=structuredClone(this.result);
+      this.handLog.players=this.handLog.players.map(entry=>{
+        const p=this.players[entry.seat];
+        return {...entry,holeCards:copyCards(p.cards),endingChips:p.chips,total:p.total,folded:p.folded,netChips:p.lastHandDelta};
+      });
+    }
+  }
+
+  completedHandFor(id) {
+    if(this.phase!=='finished'||!this.handLog?.endedAt)return null;
+    const log=this.handLog,viewerSeat=this.players.findIndex(p=>p.id===id);
+    return {
+      schemaVersion:log.schemaVersion,matchId:log.matchId,handId:log.handId,
+      startedAt:log.startedAt,endedAt:log.endedAt,dealer:log.dealer,smallBlind:log.smallBlind,bigBlind:log.bigBlind,
+      blinds:{...log.blinds},blindPosts:structuredClone(log.blindPosts),
+      players:log.players.map(p=>({
+        seat:p.seat,name:p.name,isBot:p.isBot,me:p.seat===viewerSeat,
+        startingChips:p.startingChips,endingChips:p.endingChips,total:p.total,folded:p.folded,netChips:p.netChips,
+        holeCards:p.seat===viewerSeat||(log.result?.reason==='showdown'&&!p.folded)
+          ?copyCards(p.holeCards):p.holeCards.map(()=>null),
+      })),
+      board:copyCards(log.board),result:structuredClone(log.result),actions:structuredClone(log.actions),
+    };
   }
 
   view(id) {
@@ -128,9 +189,9 @@ export class Game {
         const me = p.id === id;
         const shown = me || (this.phase === 'finished' && this.result?.reason === 'showdown' && !p.folded);
         return {
-          name:p.name, chips:p.chips, bet:p.bet, total:p.total, folded:p.folded,canRaise:this.canRaise(p),
+          seat,name:p.name, chips:p.chips, bet:p.bet, total:p.total, folded:p.folded,canRaise:this.canRaise(p),
           cards:shown ? p.cards : p.cards.map(() => null), me, isBot:Boolean(p.bot),
-          lastHandDelta:p.lastHandDelta,overallDelta:p.overallDelta??0,
+          lastHandDelta:p.lastHandDelta,overallDelta:p.overallDelta??0,stats:{...(p.stats??emptyStats())},
           winner:Boolean(this.result?.winners.some(winner => winner.seat === seat)),
           handName:shown && p.cards.length === 2 && this.board.length >= 3
             ? handName(rank([...p.cards, ...this.board])) : null,
@@ -142,6 +203,7 @@ export class Game {
       message:this.message,host:this.players[0]?.id===id,handId:this.handId,result:this.result,
       lastAction:this.lastAction,actionPending:this.pendingAdvance!==null,actingSeat:this.pendingAdvance??-1,
       nextHandAt:this.nextHandAt,serverNow:Date.now(),
+      matchId:this.matchId,matchStartedAt:this.matchStartedAt,completedHand:this.completedHandFor(id),
     };
   }
 }

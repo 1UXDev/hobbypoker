@@ -1,6 +1,8 @@
 import {quickBets} from './bets.js';
 import {renderCards} from './cards.js';
 import {createWinnerOverlay} from './winner-overlay.js';
+import {createJournal} from './journal.js';
+import {renderFace} from './faces.js';
 
 const $ = id => document.getElementById(id);
 const format = n => n.toLocaleString('de-DE');
@@ -11,6 +13,7 @@ let countdownTimer, countdownAt, announcedAllIn;
 let pendingAllIn, confirmingAllIn = false;
 let currentDraws = [];
 const winnerOverlay = createWinnerOverlay();
+const journal = createJournal();
 const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 function textElement(tag, text, className) {
   const el = document.createElement(tag);
@@ -168,9 +171,20 @@ function playerTile(player, seat, game, celebrate) {
     );
     $('players').append(el);
   }
+  const liveAllIn = !['waiting', 'finished'].includes(game.phase) && !player.folded && player.cards.length === 2;
+  el.hidden = player.chips === 0 && !liveAllIn;
+  el.dataset.seat = seat;
+  el.dataset.bot = String(player.isBot);
+  el.tabIndex = 0;
+  el.setAttribute('role', 'button');
+  el.setAttribute('aria-label', `${player.name}: Spielerstatistik öffnen`);
+  el.onclick = () => journal.openPlayer(state, seat);
+  el.onkeydown = event => {
+    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); journal.openPlayer(state, seat); }
+  };
   const acting = game.actionPending && game.lastAction?.seat === seat;
   el.className = 'player' + (game.turn === seat || acting ? ' active' : '') + (player.folded ? ' folded' : '') + (player.winner ? ' winner' : '') + (player.winner && celebrate ? ' winner-pop' : '') + (player.chips === 0 && !player.folded && !['waiting', 'finished'].includes(game.phase) ? ' allin-seat' : '');
-  el.querySelector('.avatar').textContent = player.winner ? '♛' : player.name[0].toUpperCase();
+  renderFace(el.querySelector('.avatar'), game, seat);
   el.querySelector('.player-name').textContent = player.name + (player.me ? ' (du)' : '');
   const badges = [];
   if (game.dealer === seat) badges.push(textElement('span', 'D', 'dealer-badge'));
@@ -287,8 +301,9 @@ function renderControls(game, me) {
 
 function render(game) {
   $('game').dataset.phase = game.phase;
-  $('game').style.setProperty('--player-columns', Math.min(4, game.players.length));
-  $('game').style.setProperty('--player-rows', Math.ceil(game.players.length / 4));
+  const visiblePlayers = game.players.filter(player => player.chips > 0 || (!['waiting', 'finished'].includes(game.phase) && !player.folded && player.cards.length === 2)).length;
+  $('game').style.setProperty('--player-columns', Math.max(1, Math.min(4, visiblePlayers)));
+  $('game').style.setProperty('--player-rows', Math.max(1, Math.ceil(visiblePlayers / 4)));
   const board = [...game.board, ...Array(5 - game.board.length).fill(null)];
   renderCards($('board'), board, {handId: game.handId, animate: Boolean(state), placeholders: true});
   animatePot(game.phase === 'finished' && game.result ? game.result.pot : game.pot, !state || state.handId !== game.handId);
@@ -323,6 +338,7 @@ function render(game) {
   state = game;
   if (pendingAllIn && actionContext(game) !== pendingAllIn.context) closeAllIn();
   if (!game.players[game.turn]?.me || game.actionPending) $('advanced-bets').open = false;
+  journal.record(game);
   winnerOverlay.update(game);
 }
 
@@ -377,6 +393,7 @@ $('start').onclick = run(() => api('/start'));
 $('bot').onclick = run(() => api('/bot'));
 $('show-draws').onclick = () => { renderDraws(currentDraws); $('draws-dialog').showModal(); $('close-draws').focus(); };
 $('close-draws').onclick = () => $('draws-dialog').close();
+$('history').onclick = () => journal.openHistory();
 $('show-result').onclick = () => winnerOverlay.open();
 $('loss-show-result').onclick = () => winnerOverlay.open({allowSoloLoss: true});
 $('copy').onclick = run(async () => {
